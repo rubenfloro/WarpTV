@@ -15,9 +15,12 @@ class ConfigStore(private val context: Context) {
 
     fun save(configText: String) {
         val key = getOrCreateKey()
-        val iv = ByteArray(12).also { java.security.SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+        // Android Keystore generates the random IV when encryption starts.
+        // Passing a caller-generated IV is rejected for keys that require
+        // randomized encryption, with "Caller-provided IV not permitted".
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        val iv = cipher.iv
         val ciphertext = cipher.doFinal(configText.toByteArray(StandardCharsets.UTF_8))
         prefs.edit()
             .putString("iv", Base64.encodeToString(iv, Base64.NO_WRAP))
