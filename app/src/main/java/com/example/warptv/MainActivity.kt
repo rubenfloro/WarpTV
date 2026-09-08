@@ -27,6 +27,7 @@ class MainActivity : Activity() {
         const val BUTTON_BLUE_FOCUSED = 0xFF7DD3FC.toInt()
         const val BUTTON_DISABLED = 0xFF64748B.toInt()
         const val BUTTON_TEXT = 0xFF062A3F.toInt()
+        const val REQUEST_VPN = 1001
     }
 
     private lateinit var status: TextView
@@ -192,5 +193,4 @@ class MainActivity : Activity() {
 
     override fun onDestroy() { executor.shutdownNow(); super.onDestroy() }
 
-    companion object { private const val REQUEST_VPN = 1001 }
 }
