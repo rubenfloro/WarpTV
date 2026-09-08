@@ -6,7 +6,7 @@
     <application
         android:theme="@style/AppTheme"
         android:label="WARP TV"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/ic_launcher_custom"
         android:banner="@drawable/tv_banner"
         android:allowBackup="false"
         android:supportsRtl="true">

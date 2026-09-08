@@ -2,6 +2,9 @@ package com.example.warptv
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.net.VpnService
 import android.os.Bundle
 import android.view.Gravity
@@ -16,6 +19,16 @@ import com.wireguard.config.Config
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
+    private companion object {
+        const val STATUS_RED = 0xFFFF5B61.toInt()
+        const val STATUS_GREEN = 0xFF2ECC71.toInt()
+        const val STATUS_NEUTRAL = 0xFFB8BDC7.toInt()
+        const val BUTTON_BLUE = 0xFF55B9EA.toInt()
+        const val BUTTON_BLUE_FOCUSED = 0xFF7DD3FC.toInt()
+        const val BUTTON_DISABLED = 0xFF64748B.toInt()
+        const val BUTTON_TEXT = 0xFF062A3F.toInt()
+    }
+
     private lateinit var status: TextView
     private lateinit var details: TextView
     private lateinit var button: Button
@@ -53,14 +66,20 @@ class MainActivity : Activity() {
         }
         status = TextView(this).apply {
             textSize = 28f; gravity = Gravity.CENTER; setPadding(0, 24, 0, 12)
-            setTextColor(0xFFFFFFFF.toInt())
+            setTextColor(STATUS_NEUTRAL)
         }
         details = TextView(this).apply {
             textSize = 18f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 30)
-            setTextColor(0xFFB8BDC7.toInt())
+            setTextColor(STATUS_NEUTRAL)
         }
         button = Button(this).apply {
-            textSize = 24f; isFocusable = true; isFocusableInTouchMode = true
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(BUTTON_TEXT)
+            setPadding(24, 0, 24, 0)
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = buttonBackground()
             setOnClickListener { onMainButton() }
         }
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
@@ -92,6 +111,7 @@ class MainActivity : Activity() {
 
     private fun generateConfig() {
         button.isEnabled = false
+        status.setTextColor(STATUS_NEUTRAL)
         status.text = "GENERANDO CONFIGURACIÓN…"
         details.text = "Registrando este dispositivo con WARP"
         executor.execute {
@@ -122,6 +142,7 @@ class MainActivity : Activity() {
         if (requestCode == REQUEST_VPN) {
             if (resultCode == RESULT_OK && pendingConnect) connect()
             else if (resultCode != RESULT_OK) {
+                status.setTextColor(STATUS_RED)
                 status.text = "AUTORIZACIÓN VPN CANCELADA"
                 details.text = "Pulsa el botón para volver a intentarlo"
             }
@@ -133,11 +154,13 @@ class MainActivity : Activity() {
 
     private fun render(state: Tunnel.State) {
         if (state == Tunnel.State.UP) {
-            status.text = "● CONECTADA"
+            status.setTextColor(STATUS_GREEN)
+            status.text = "● VPN CONECTADA"
             button.text = "APAGAR VPN"
             details.text = "WireGuard / WARP activo"
         } else {
-            status.text = "○ DESCONECTADA"
+            status.setTextColor(STATUS_RED)
+            status.text = "● VPN DESCONECTADA"
             button.text = if (config == null) "CONFIGURAR WARP" else "ENCENDER VPN"
             if (config == null) details.text = "Configuración pendiente" else details.text = "VPN apagada por el usuario"
         }
@@ -146,9 +169,24 @@ class MainActivity : Activity() {
     private fun showError(t: Throwable) {
         runOnUiThread {
             button.isEnabled = true
+            status.setTextColor(STATUS_RED)
             status.text = "ERROR"
             details.text = (t.message ?: t.javaClass.simpleName).take(180)
             button.text = if (config == null) "REINTENTAR" else "ENCENDER VPN"
+        }
+    }
+
+    private fun buttonBackground(): StateListDrawable {
+        fun fill(color: Int) = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 18f
+            setColor(color)
+        }
+
+        return StateListDrawable().apply {
+            addState(intArrayOf(-android.R.attr.state_enabled), fill(BUTTON_DISABLED))
+            addState(intArrayOf(android.R.attr.state_focused), fill(BUTTON_BLUE_FOCUSED))
+            addState(intArrayOf(), fill(BUTTON_BLUE))
         }
     }
 
