@@ -40,7 +40,6 @@ class MainActivity : Activity() {
     private lateinit var metrics: TextView
     private lateinit var diagnostics: TextView
     private lateinit var button: Button
-    private lateinit var diagnosticsButton: Button
     private val executor = Executors.newSingleThreadExecutor()
     private val metricsHandler = Handler(Looper.getMainLooper())
     private val store by lazy { ConfigStore(this) }
@@ -48,8 +47,10 @@ class MainActivity : Activity() {
     private var config: Config? = null
     private var pendingConnect = false
     private var lastRenderedState: Tunnel.State? = null
-    private var diagnosticsRefreshRunning = false
+    private var diagnosticsQueryRunning = false
     private val tunnel = WarpRuntime.tunnel
+    private val connectedDiagnosticsRunnable = Runnable { queryConnectedDiagnostics() }
+    private val disconnectedDiagnosticsRunnable = Runnable { queryDisconnectedIp() }
     private val metricsTicker = object : Runnable {
         override fun run() {
             refreshMetrics()
@@ -100,17 +101,6 @@ class MainActivity : Activity() {
             textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 18)
             setTextColor(STATUS_NEUTRAL)
         }
-        diagnosticsButton = Button(this).apply {
-            text = "ACTUALIZAR DIAGNÓSTICO"
-            textSize = 18f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(BUTTON_TEXT)
-            setPadding(24, 0, 24, 0)
-            isFocusable = true
-            isFocusableInTouchMode = true
-            background = buttonBackground()
-            setOnClickListener { refreshDiagnostics() }
-        }
         button = Button(this).apply {
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
@@ -126,7 +116,6 @@ class MainActivity : Activity() {
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(diagnosticsButton, LinearLayout.LayoutParams(560, 96))
         root.addView(button, LinearLayout.LayoutParams(560, 110))
         setContentView(root)
         button.requestFocus()
@@ -181,6 +170,8 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         metricsHandler.removeCallbacks(metricsTicker)
+        metricsHandler.removeCallbacks(connectedDiagnosticsRunnable)
+        metricsHandler.removeCallbacks(disconnectedDiagnosticsRunnable)
         super.onPause()
     }
 
@@ -217,8 +208,7 @@ class MainActivity : Activity() {
             button.text = "CONFIGURAR WARP"
             details.text = "Configuración pendiente"
             metrics.text = ""
-            diagnostics.text = "El diagnóstico estará disponible después de configurar WARP"
-            diagnosticsButton.isEnabled = false
+            diagnostics.text = ""
         } else if (state == Tunnel.State.UP) {
             WarpRuntime.ensureConnectionStarted()
             status.setTextColor(STATUS_GREEN)
@@ -226,8 +216,7 @@ class MainActivity : Activity() {
             button.text = "APAGAR VPN"
             details.text = "WireGuard / WARP activo"
             metrics.text = formatMetrics(WarpRuntime.connectionStartMillis(), 0L, 0L)
-            diagnosticsButton.isEnabled = !diagnosticsRefreshRunning
-            if (lastRenderedState != Tunnel.State.UP) refreshDiagnostics()
+            if (lastRenderedState != Tunnel.State.UP) scheduleConnectedDiagnostics()
         } else {
             WarpRuntime.clearConnectionStart()
             status.setTextColor(STATUS_RED)
@@ -235,10 +224,11 @@ class MainActivity : Activity() {
             button.text = if (config == null) "CONFIGURAR WARP" else "ENCENDER VPN"
             if (config == null) details.text = "Configuración pendiente" else details.text = "VPN apagada por el usuario"
             metrics.text = ""
-            diagnosticsButton.isEnabled = !diagnosticsRefreshRunning
-            if (!diagnosticsRefreshRunning) {
-                val baseline = WarpDiagnostics.loadBaselineIp(this) ?: "No disponible"
-                diagnostics.text = "IP sin VPN: $baseline\nPulsa ACTUALIZAR DIAGNÓSTICO para consultar la conexión"
+            metricsHandler.removeCallbacks(connectedDiagnosticsRunnable)
+            val baseline = WarpDiagnostics.loadBaselineIp(this)
+            diagnostics.text = formatDisconnectedDiagnostics(baseline)
+            if (lastRenderedState == null || lastRenderedState == Tunnel.State.UP || baseline == null) {
+                scheduleDisconnectedDiagnostics()
             }
         }
         lastRenderedState = state
@@ -252,7 +242,6 @@ class MainActivity : Activity() {
             details.text = (t.message ?: t.javaClass.simpleName).take(180)
             metrics.text = ""
             button.text = if (config == null) "REINTENTAR" else "ENCENDER VPN"
-            diagnosticsButton.isEnabled = config != null
         }
     }
 
@@ -298,34 +287,58 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun refreshDiagnostics() {
-        if (diagnosticsRefreshRunning || config == null) return
-        diagnosticsRefreshRunning = true
-        diagnosticsButton.isEnabled = false
-        diagnostics.text = "Comprobando IP, WARP y latencia…"
+    private fun scheduleConnectedDiagnostics() {
+        if (diagnosticsQueryRunning || config == null) return
+        metricsHandler.removeCallbacks(connectedDiagnosticsRunnable)
+        val baseline = WarpDiagnostics.loadBaselineIp(this)
+        diagnostics.text = formatConnectedWaitingDiagnostics(baseline)
+        metricsHandler.postDelayed(connectedDiagnosticsRunnable, 2_000L)
+    }
+
+    private fun queryConnectedDiagnostics() {
+        if (diagnosticsQueryRunning || config == null || currentState() != Tunnel.State.UP) return
+        diagnosticsQueryRunning = true
         executor.execute {
             try {
-                val connected = currentState() == Tunnel.State.UP
                 val trace = WarpDiagnostics.queryTrace()
-                if (!connected) trace.ip?.let { WarpDiagnostics.saveBaselineIp(this, it) }
                 val baseline = WarpDiagnostics.loadBaselineIp(this)
-                val handshake = if (connected) latestHandshakeEpochMillis() else 0L
-                val text = formatDiagnostics(trace, baseline, handshake, connected)
+                val text = formatConnectedDiagnostics(baseline, trace)
                 runOnUiThread {
-                    diagnosticsRefreshRunning = false
-                    if (!isFinishing) {
-                        diagnostics.text = text
-                        diagnosticsButton.isEnabled = config != null
-                    }
+                    diagnosticsQueryRunning = false
+                    if (!isFinishing && currentState() == Tunnel.State.UP) diagnostics.text = text
+                    else if (!isFinishing) scheduleDisconnectedDiagnostics()
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 runOnUiThread {
-                    diagnosticsRefreshRunning = false
-                    if (!isFinishing) {
-                        diagnostics.text = "No se pudo actualizar el diagnóstico\n${e.message ?: "Comprueba la conexión a Internet"}"
-                        diagnosticsButton.isEnabled = config != null
-                    }
+                    diagnosticsQueryRunning = false
+                    if (!isFinishing && currentState() == Tunnel.State.UP) {
+                        diagnostics.text = formatConnectedWaitingDiagnostics(WarpDiagnostics.loadBaselineIp(this))
+                    } else if (!isFinishing) scheduleDisconnectedDiagnostics()
                 }
+            }
+        }
+    }
+
+    private fun scheduleDisconnectedDiagnostics() {
+        if (diagnosticsQueryRunning || config == null) return
+        metricsHandler.removeCallbacks(disconnectedDiagnosticsRunnable)
+        metricsHandler.postDelayed(disconnectedDiagnosticsRunnable, 2_000L)
+    }
+
+    private fun queryDisconnectedIp() {
+        if (diagnosticsQueryRunning || config == null || currentState() == Tunnel.State.UP) return
+        diagnosticsQueryRunning = true
+        executor.execute {
+            try {
+                val trace = WarpDiagnostics.queryTrace()
+                trace.ip?.let { WarpDiagnostics.saveBaselineIp(this, it) }
+                val text = formatDisconnectedDiagnostics(WarpDiagnostics.loadBaselineIp(this))
+                runOnUiThread {
+                    diagnosticsQueryRunning = false
+                    if (!isFinishing && currentState() != Tunnel.State.UP) diagnostics.text = text
+                }
+            } catch (_: Exception) {
+                runOnUiThread { diagnosticsQueryRunning = false }
             }
         }
     }
@@ -336,46 +349,23 @@ class MainActivity : Activity() {
             ?.let { WarpDiagnostics.saveBaselineIp(this, it) }
     }
 
-    private fun latestHandshakeEpochMillis(): Long {
-        val stats = runCatching { backend?.getStatistics(tunnel) }.getOrNull() ?: return 0L
-        return stats.peers().mapNotNull { peerKey ->
-            val peerStats = stats.peer(peerKey) ?: return@mapNotNull null
-            // Supports both the record accessor in current WireGuard and the older public field.
-            runCatching {
-                (peerStats.javaClass.getMethod("latestHandshakeEpochMillis").invoke(peerStats) as Number).toLong()
-            }.recoverCatching {
-                (peerStats.javaClass.getField("latestHandshakeEpochMillis").get(peerStats) as Number).toLong()
-            }.getOrNull()
-        }.maxOrNull() ?: 0L
+    private fun formatConnectedWaitingDiagnostics(baselineIp: String?): String {
+        return "IP Pública sin VPN: ${baselineIp ?: "No disponible"}\n" +
+            "IP Pública con WARP: comprobando…\n" +
+            "Localización Cloudflare: comprobando…"
     }
 
-    private fun formatDiagnostics(
-        trace: WarpDiagnostics.TraceResult,
+    private fun formatConnectedDiagnostics(
         baselineIp: String?,
-        handshakeEpochMillis: Long,
-        connected: Boolean
+        trace: WarpDiagnostics.TraceResult
     ): String {
-        val warpText = when {
-            trace.warpVerified -> "Sí"
-            trace.warpStatus != null -> "No (${trace.warpStatus})"
-            else -> "No disponible"
-        }
-        val colo = trace.colo ?: "No disponible"
-        val observedIpLabel = if (connected) "IP con WARP" else "IP actual sin VPN"
-        return "IP sin VPN: ${baselineIp ?: "No disponible"}\n" +
-            "$observedIpLabel: ${trace.ip ?: "No disponible"}\n" +
-            "WARP verificado: $warpText    Punto Cloudflare: $colo\n" +
-            "Handshake: ${formatHandshake(handshakeEpochMillis)}    Latencia: ${trace.latencyMillis} ms"
+        return "IP Pública sin VPN: ${baselineIp ?: "No disponible"}\n" +
+            "IP Pública con WARP: ${trace.ip ?: "No disponible"}\n" +
+            "Localización Cloudflare: ${trace.colo ?: "No disponible"}"
     }
 
-    private fun formatHandshake(epochMillis: Long): String {
-        if (epochMillis <= 0L) return "No disponible"
-        val ageSeconds = ((System.currentTimeMillis() - epochMillis).coerceAtLeast(0L)) / 1000L
-        return when {
-            ageSeconds < 60L -> "hace ${ageSeconds}s"
-            ageSeconds < 3_600L -> "hace ${ageSeconds / 60L} min"
-            else -> "hace ${ageSeconds / 3_600L} h"
-        }
+    private fun formatDisconnectedDiagnostics(baselineIp: String?): String {
+        return "IP Pública sin VPN: ${baselineIp ?: "No disponible"}"
     }
 
     private fun formatMetrics(startMillis: Long, rxBytes: Long, txBytes: Long): String {
@@ -440,6 +430,8 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         WarpRuntime.setStateListener(null)
         metricsHandler.removeCallbacks(metricsTicker)
+        metricsHandler.removeCallbacks(connectedDiagnosticsRunnable)
+        metricsHandler.removeCallbacks(disconnectedDiagnosticsRunnable)
         executor.shutdownNow()
         super.onDestroy()
     }

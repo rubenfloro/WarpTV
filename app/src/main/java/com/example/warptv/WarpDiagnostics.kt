@@ -5,7 +5,6 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Locale
 
 /** Reads public connection details through Cloudflare's diagnostic trace endpoint. */
 object WarpDiagnostics {
@@ -15,14 +14,8 @@ object WarpDiagnostics {
 
     data class TraceResult(
         val ip: String?,
-        val warpStatus: String?,
-        val colo: String?,
-        val latencyMillis: Long
-    ) {
-        val warpVerified: Boolean
-            get() = warpStatus?.lowercase(Locale.US) == "on" ||
-                warpStatus?.lowercase(Locale.US) == "plus"
-    }
+        val colo: String?
+    )
 
     fun loadBaselineIp(context: Context): String? = context
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -36,7 +29,6 @@ object WarpDiagnostics {
     }
 
     fun queryTrace(): TraceResult {
-        val startedAt = System.nanoTime()
         val connection = (URL(TRACE_URL).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 10_000
@@ -62,9 +54,7 @@ object WarpDiagnostics {
                 .toMap()
             TraceResult(
                 ip = values["ip"].orEmpty().takeIf { it.isNotBlank() },
-                warpStatus = values["warp"].orEmpty().takeIf { it.isNotBlank() },
-                colo = values["colo"].orEmpty().takeIf { it.isNotBlank() },
-                latencyMillis = ((System.nanoTime() - startedAt) / 1_000_000L).coerceAtLeast(0L)
+                colo = values["colo"].orEmpty().takeIf { it.isNotBlank() }
             )
         } finally {
             connection.disconnect()
