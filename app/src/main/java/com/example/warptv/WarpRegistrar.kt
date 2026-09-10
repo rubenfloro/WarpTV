@@ -15,6 +15,7 @@ import java.util.TimeZone
 /** Registers a fresh WireGuard public key with Cloudflare WARP and builds a WireGuard Config. */
 object WarpRegistrar {
     private const val API_URL = "https://api.cloudflareclient.com/v0a737/reg"
+    const val PREFERRED_DNS = "94.140.14.14, 94.140.15.15, 2a10:50c0::ad1:ff, 2a10:50c0::ad2:ff"
 
     data class Result(val config: Config, val accountId: String?, val deviceId: String?)
 
@@ -56,7 +57,7 @@ object WarpRegistrar {
             append("[Interface]\n")
             append("PrivateKey = ").append(keyPair.privateKey.toBase64()).append('\n')
             append("Address = ").append(addresses).append('\n')
-            append("DNS = 1.1.1.1, 1.0.0.1\n")
+            append("DNS = ").append(PREFERRED_DNS).append('\n')
             append("MTU = 1280\n\n")
             append("[Peer]\n")
             append("PublicKey = ").append(peerPublic).append('\n')
