@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -40,6 +41,8 @@ class MainActivity : Activity() {
     private lateinit var metrics: TextView
     private lateinit var diagnostics: TextView
     private lateinit var button: Button
+    private lateinit var operatorBlockStatus: TextView
+    private lateinit var operatorRefreshButton: Button
     private val executor = Executors.newSingleThreadExecutor()
     private val metricsHandler = Handler(Looper.getMainLooper())
     private val store by lazy { ConfigStore(this) }
@@ -48,6 +51,7 @@ class MainActivity : Activity() {
     private var pendingConnect = false
     private var lastRenderedState: Tunnel.State? = null
     private var diagnosticsQueryRunning = false
+    private var operatorStatusQueryRunning = false
     private val tunnel = WarpRuntime.tunnel
     private val connectedDiagnosticsRunnable = Runnable { queryConnectedDiagnostics() }
     private val disconnectedDiagnosticsRunnable = Runnable { queryDisconnectedIp() }
@@ -101,6 +105,21 @@ class MainActivity : Activity() {
             textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 18)
             setTextColor(STATUS_NEUTRAL)
         }
+        operatorBlockStatus = TextView(this).apply {
+            textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 18, 0, 18)
+            setTextColor(STATUS_NEUTRAL)
+        }
+        operatorRefreshButton = Button(this).apply {
+            text = "ACTUALIZAR DATOS"
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(BUTTON_TEXT)
+            setPadding(24, 0, 24, 0)
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = buttonBackground()
+            setOnClickListener { refreshOperatorBlockStatus() }
+        }
         button = Button(this).apply {
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
@@ -117,6 +136,8 @@ class MainActivity : Activity() {
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
         root.addView(button, LinearLayout.LayoutParams(560, 110))
+        root.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
+        root.addView(operatorRefreshButton, LinearLayout.LayoutParams(560, 96))
         setContentView(root)
         button.requestFocus()
     }
@@ -209,6 +230,8 @@ class MainActivity : Activity() {
             details.text = "Configuración pendiente"
             metrics.text = ""
             diagnostics.text = ""
+            operatorBlockStatus.visibility = View.GONE
+            operatorRefreshButton.visibility = View.GONE
         } else if (state == Tunnel.State.UP) {
             WarpRuntime.ensureConnectionStarted()
             status.setTextColor(STATUS_GREEN)
@@ -217,6 +240,7 @@ class MainActivity : Activity() {
             details.text = "WireGuard / WARP activo"
             metrics.text = formatMetrics(WarpRuntime.connectionStartMillis(), 0L, 0L)
             if (lastRenderedState != Tunnel.State.UP) scheduleConnectedDiagnostics()
+            showOperatorBlockStatus()
         } else {
             WarpRuntime.clearConnectionStart()
             status.setTextColor(STATUS_RED)
@@ -230,6 +254,7 @@ class MainActivity : Activity() {
             if (lastRenderedState == null || lastRenderedState == Tunnel.State.UP || baseline == null) {
                 scheduleDisconnectedDiagnostics()
             }
+            showOperatorBlockStatus()
         }
         lastRenderedState = state
     }
@@ -341,6 +366,50 @@ class MainActivity : Activity() {
                 runOnUiThread { diagnosticsQueryRunning = false }
             }
         }
+    }
+
+    private fun showOperatorBlockStatus() {
+        operatorBlockStatus.visibility = View.VISIBLE
+        operatorRefreshButton.visibility = View.VISIBLE
+        operatorRefreshButton.isEnabled = !operatorStatusQueryRunning
+        if (operatorBlockStatus.text.isNullOrBlank()) refreshOperatorBlockStatus()
+    }
+
+    private fun refreshOperatorBlockStatus() {
+        if (operatorStatusQueryRunning || config == null) return
+        operatorStatusQueryRunning = true
+        operatorRefreshButton.isEnabled = false
+        operatorBlockStatus.setTextColor(STATUS_NEUTRAL)
+        operatorBlockStatus.text = "Bloqueos Fútbol: COMPROBANDO…\nIPs afectadas: —\nOperadores afectados: —"
+        executor.execute {
+            try {
+                val result = OperatorBlockStatus.fetch()
+                runOnUiThread {
+                    operatorStatusQueryRunning = false
+                    if (!isFinishing) renderOperatorBlockStatus(result)
+                }
+            } catch (_: Exception) {
+                runOnUiThread {
+                    operatorStatusQueryRunning = false
+                    if (!isFinishing) {
+                        operatorBlockStatus.setTextColor(STATUS_NEUTRAL)
+                        operatorBlockStatus.text = "Bloqueos Fútbol: DATOS NO DISPONIBLES\nIPs afectadas: —\nOperadores afectados: —"
+                        operatorRefreshButton.isEnabled = config != null
+                    }
+                }
+            }
+        }
+    }
+
+    private fun renderOperatorBlockStatus(result: OperatorBlockStatus.Result) {
+        val incidents = result.blockedIpCount > 0 || result.affectedOperators.isNotEmpty()
+        operatorBlockStatus.setTextColor(if (incidents) STATUS_RED else STATUS_GREEN)
+        val operators = result.affectedOperators.joinToString(", ").ifBlank { "Ninguno" }
+        operatorBlockStatus.text =
+            "Bloqueos Fútbol: ${if (incidents) "INCIDENCIAS DETECTADAS" else "SIN INCIDENCIAS"}\n" +
+                "IPs afectadas: ${result.blockedIpCount}\n" +
+                "Operadores afectados: $operators"
+        operatorRefreshButton.isEnabled = config != null
     }
 
     private fun captureBaselineIp() {
