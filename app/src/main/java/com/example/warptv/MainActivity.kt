@@ -1,7 +1,11 @@
 package com.example.warptv
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.StateListAnimator
 import android.app.Activity
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
@@ -28,9 +32,9 @@ class MainActivity : Activity() {
         const val STATUS_RED = 0xFFFF5B61.toInt()
         const val STATUS_GREEN = 0xFF2ECC71.toInt()
         const val STATUS_NEUTRAL = 0xFFB8BDC7.toInt()
-        const val BUTTON_BLUE = 0xFF55B9EA.toInt()
-        const val BUTTON_BLUE_FOCUSED = 0xFF7DD3FC.toInt()
-        const val BUTTON_BLUE_PRESSED = 0xFF2D90C4.toInt()
+        const val BUTTON_BLUE = 0xFF2563A9.toInt()
+        const val BUTTON_BLUE_FOCUSED = 0xFF38C8FF.toInt()
+        const val BUTTON_BLUE_PRESSED = 0xFF0C4775.toInt()
         const val BUTTON_DISABLED = 0xFF64748B.toInt()
         const val BUTTON_TEXT = 0xFF062A3F.toInt()
         const val REQUEST_VPN = 1001
@@ -113,21 +117,23 @@ class MainActivity : Activity() {
             text = "ACTUALIZAR DATOS"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(BUTTON_TEXT)
+            setTextColor(buttonTextColor())
             setPadding(24, 0, 24, 0)
             isFocusable = true
             isFocusableInTouchMode = true
             background = buttonBackground()
+            stateListAnimator = buttonInteractionAnimator(this)
             setOnClickListener { refreshOperatorBlockStatus() }
         }
         button = Button(this).apply {
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(BUTTON_TEXT)
+            setTextColor(buttonTextColor())
             setPadding(24, 0, 24, 0)
             isFocusable = true
             isFocusableInTouchMode = true
             background = buttonBackground()
+            stateListAnimator = buttonInteractionAnimator(this)
             setOnClickListener { onMainButton() }
         }
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
@@ -271,17 +277,57 @@ class MainActivity : Activity() {
     }
 
     private fun buttonBackground(): StateListDrawable {
-        fun fill(color: Int) = GradientDrawable().apply {
+        fun fill(color: Int, strokeColor: Int, strokeWidth: Int) = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 18f
             setColor(color)
+            setStroke(strokeWidth, strokeColor)
         }
 
         return StateListDrawable().apply {
-            addState(intArrayOf(-android.R.attr.state_enabled), fill(BUTTON_DISABLED))
-            addState(intArrayOf(android.R.attr.state_pressed), fill(BUTTON_BLUE_PRESSED))
-            addState(intArrayOf(android.R.attr.state_focused), fill(BUTTON_BLUE_FOCUSED))
-            addState(intArrayOf(), fill(BUTTON_BLUE))
+            addState(intArrayOf(-android.R.attr.state_enabled), fill(BUTTON_DISABLED, 0xFF94A3B8.toInt(), 2))
+            addState(intArrayOf(android.R.attr.state_pressed), fill(BUTTON_BLUE_PRESSED, 0xFFBFEFFF.toInt(), 4))
+            addState(intArrayOf(android.R.attr.state_focused), fill(BUTTON_BLUE_FOCUSED, 0xFFFFFFFF.toInt(), 5))
+            addState(intArrayOf(), fill(BUTTON_BLUE, 0xFF164B7A.toInt(), 2))
+        }
+    }
+
+    private fun buttonTextColor(): ColorStateList {
+        return ColorStateList(
+            arrayOf(
+                intArrayOf(-android.R.attr.state_enabled),
+                intArrayOf(android.R.attr.state_pressed),
+                intArrayOf(android.R.attr.state_focused),
+                intArrayOf()
+            ),
+            intArrayOf(
+                0xFFE2E8F0.toInt(),
+                BUTTON_TEXT,
+                0xFFFFFFFF.toInt(),
+                0xFFFFFFFF.toInt()
+            )
+        )
+    }
+
+    private fun buttonInteractionAnimator(view: View): StateListAnimator {
+        fun animation(scale: Float, translationY: Float, elevation: Float): AnimatorSet {
+            return AnimatorSet().apply {
+                playTogether(
+                    ObjectAnimator.ofFloat(view, "scaleX", scale),
+                    ObjectAnimator.ofFloat(view, "scaleY", scale),
+                    ObjectAnimator.ofFloat(view, "translationY", translationY),
+                    ObjectAnimator.ofFloat(view, "elevation", elevation)
+                )
+                duration = 110L
+                interpolator = android.view.animation.DecelerateInterpolator()
+            }
+        }
+
+        return StateListAnimator().apply {
+            addState(intArrayOf(-android.R.attr.state_enabled), animation(1f, 0f, 0f))
+            addState(intArrayOf(android.R.attr.state_pressed), animation(0.96f, 4f, 2f))
+            addState(intArrayOf(android.R.attr.state_focused), animation(1.03f, -3f, 10f))
+            addState(intArrayOf(), animation(1f, 0f, 0f))
         }
     }
 
@@ -371,14 +417,17 @@ class MainActivity : Activity() {
     private fun showOperatorBlockStatus() {
         operatorBlockStatus.visibility = View.VISIBLE
         operatorRefreshButton.visibility = View.VISIBLE
-        operatorRefreshButton.isEnabled = !operatorStatusQueryRunning
+        operatorRefreshButton.isEnabled = true
+        operatorRefreshButton.alpha = if (operatorStatusQueryRunning) 0.65f else 1f
         if (operatorBlockStatus.text.isNullOrBlank()) refreshOperatorBlockStatus()
     }
 
     private fun refreshOperatorBlockStatus() {
         if (operatorStatusQueryRunning || config == null) return
         operatorStatusQueryRunning = true
-        operatorRefreshButton.isEnabled = false
+        operatorRefreshButton.isEnabled = true
+        operatorRefreshButton.alpha = 0.65f
+        operatorRefreshButton.requestFocus()
         operatorBlockStatus.setTextColor(STATUS_NEUTRAL)
         operatorBlockStatus.text = "Bloqueos Fútbol: COMPROBANDO…\nIPs afectadas: —\nOperadores afectados: —"
         executor.execute {
@@ -386,7 +435,10 @@ class MainActivity : Activity() {
                 val result = OperatorBlockStatus.fetch()
                 runOnUiThread {
                     operatorStatusQueryRunning = false
-                    if (!isFinishing) renderOperatorBlockStatus(result)
+                    if (!isFinishing) {
+                        renderOperatorBlockStatus(result)
+                        operatorRefreshButton.alpha = 1f
+                    }
                 }
             } catch (_: Exception) {
                 runOnUiThread {
@@ -394,7 +446,8 @@ class MainActivity : Activity() {
                     if (!isFinishing) {
                         operatorBlockStatus.setTextColor(STATUS_NEUTRAL)
                         operatorBlockStatus.text = "Bloqueos Fútbol: DATOS NO DISPONIBLES\nIPs afectadas: —\nOperadores afectados: —"
-                        operatorRefreshButton.isEnabled = config != null
+                        operatorRefreshButton.isEnabled = true
+                        operatorRefreshButton.alpha = 1f
                     }
                 }
             }
@@ -409,7 +462,8 @@ class MainActivity : Activity() {
             "Bloqueos Fútbol: ${if (incidents) "INCIDENCIAS DETECTADAS" else "SIN INCIDENCIAS"}\n" +
                 "IPs afectadas: ${result.blockedIpCount}\n" +
                 "Operadores afectados: $operators"
-        operatorRefreshButton.isEnabled = config != null
+        operatorRefreshButton.isEnabled = true
+        operatorRefreshButton.alpha = 1f
     }
 
     private fun captureBaselineIp() {
