@@ -111,10 +111,11 @@ class MainActivity : Activity() {
             setTextColor(STATUS_NEUTRAL)
         }
         operatorBlockStatus = TextView(this).apply {
-            textSize = 16f
+            textSize = 15f
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            setPadding(20, 12, 20, 12)
+            setPadding(0, 12, 0, 12)
             maxLines = 3
+            isHorizontallyScrolling = false
             setTextColor(STATUS_NEUTRAL)
         }
         operatorRefreshButton = Button(this).apply {
@@ -143,11 +144,13 @@ class MainActivity : Activity() {
         operatorPanel = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(20, 12, 20, 12)
+            setPadding(28, 12, 36, 12)
             background = operatorPanelBackground()
         }
-        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f))
-        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(520, 88))
+        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f).apply {
+            marginEnd = 24
+        })
+        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(440, 88))
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
