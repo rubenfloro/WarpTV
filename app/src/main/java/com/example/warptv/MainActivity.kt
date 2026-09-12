@@ -115,7 +115,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             setPadding(0, 12, 0, 12)
             maxLines = 3
-            isHorizontallyScrolling = false
+            setHorizontallyScrolling(false)
             setTextColor(STATUS_NEUTRAL)
         }
         operatorRefreshButton = Button(this).apply {
