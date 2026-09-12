@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.warptv"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.3"
+        versionCode = 8
+        versionName = "1.2.5"
     }
 
     buildFeatures { buildConfig = true }

@@ -45,6 +45,7 @@ class MainActivity : Activity() {
     private lateinit var metrics: TextView
     private lateinit var diagnostics: TextView
     private lateinit var button: Button
+    private lateinit var operatorPanel: LinearLayout
     private lateinit var operatorBlockStatus: TextView
     private lateinit var operatorRefreshButton: Button
     private val executor = Executors.newSingleThreadExecutor()
@@ -110,11 +111,13 @@ class MainActivity : Activity() {
             setTextColor(STATUS_NEUTRAL)
         }
         operatorBlockStatus = TextView(this).apply {
-            textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 18, 0, 18)
+            textSize = 16f
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            setPadding(20, 12, 20, 12)
             setTextColor(STATUS_NEUTRAL)
         }
         operatorRefreshButton = Button(this).apply {
-            text = "ACTUALIZAR DATOS"
+            text = "ACTUALIZAR DATOS BLOQUEOS"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
@@ -126,7 +129,7 @@ class MainActivity : Activity() {
             setOnClickListener { refreshOperatorBlockStatus() }
         }
         button = Button(this).apply {
-            textSize = 24f
+            textSize = 26f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
             setPadding(24, 0, 24, 0)
@@ -136,16 +139,23 @@ class MainActivity : Activity() {
             stateListAnimator = buttonInteractionAnimator(this)
             setOnClickListener { onMainButton() }
         }
+        operatorPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(20, 12, 20, 12)
+            background = operatorPanelBackground()
+        }
+        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -2, 1f))
+        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(520, 88))
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(button, LinearLayout.LayoutParams(560, 110))
-        root.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
-        root.addView(operatorRefreshButton, LinearLayout.LayoutParams(560, 96))
+        root.addView(button, LinearLayout.LayoutParams(640, 128))
+        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 124))
         setContentView(root)
-        button.requestFocus()
+        button.post { button.requestFocus() }
     }
 
     private fun onMainButton() {
@@ -190,6 +200,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Android TV may restore the last focused view; the VPN action is always the default.
+        button.post { if (!isFinishing) button.requestFocus() }
         refreshState()
         metricsHandler.removeCallbacks(metricsTicker)
         metricsHandler.post(metricsTicker)
@@ -236,8 +248,7 @@ class MainActivity : Activity() {
             details.text = "Configuración pendiente"
             metrics.text = ""
             diagnostics.text = ""
-            operatorBlockStatus.visibility = View.GONE
-            operatorRefreshButton.visibility = View.GONE
+            operatorPanel.visibility = View.GONE
         } else if (state == Tunnel.State.UP) {
             WarpRuntime.ensureConnectionStarted()
             status.setTextColor(STATUS_GREEN)
@@ -331,6 +342,15 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun operatorPanelBackground(): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 18f
+            setColor(0xFF101820.toInt())
+            setStroke(2, 0xFF263746.toInt())
+        }
+    }
+
     private fun refreshState() {
         executor.execute {
             val state = currentState()
@@ -415,8 +435,7 @@ class MainActivity : Activity() {
     }
 
     private fun showOperatorBlockStatus() {
-        operatorBlockStatus.visibility = View.VISIBLE
-        operatorRefreshButton.visibility = View.VISIBLE
+        operatorPanel.visibility = View.VISIBLE
         operatorRefreshButton.isEnabled = true
         operatorRefreshButton.alpha = if (operatorStatusQueryRunning) 0.65f else 1f
         if (operatorBlockStatus.text.isNullOrBlank()) refreshOperatorBlockStatus()
