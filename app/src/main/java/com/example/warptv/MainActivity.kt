@@ -114,10 +114,11 @@ class MainActivity : Activity() {
             textSize = 16f
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             setPadding(20, 12, 20, 12)
+            maxLines = 3
             setTextColor(STATUS_NEUTRAL)
         }
         operatorRefreshButton = Button(this).apply {
-            text = "ACTUALIZAR DATOS BLOQUEOS"
+            text = "ACTUALIZAR DATOS"
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
@@ -145,15 +146,15 @@ class MainActivity : Activity() {
             setPadding(20, 12, 20, 12)
             background = operatorPanelBackground()
         }
-        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -2, 1f))
+        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f))
         operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(520, 88))
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(button, LinearLayout.LayoutParams(640, 128))
-        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 124))
+        root.addView(button, LinearLayout.LayoutParams(640, 128).apply { bottomMargin = 28 })
+        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 156))
         setContentView(root)
         button.post { button.requestFocus() }
     }
