@@ -145,7 +145,8 @@ class MainActivity : Activity() {
             isFocusable = true
             isFocusableInTouchMode = true
             background = buttonBackground()
-            stateListAnimator = buttonInteractionAnimator(this, focusedScale = 1f)
+            // En Android TV el foco no debe hacer crecer este botón hacia el borde del panel.
+            stateListAnimator = buttonInteractionAnimator(this, focusedScale = 0.96f, pressedScale = 0.96f)
             setOnClickListener { refreshOperatorBlockStatus() }
         }
         button = Button(this).apply {
@@ -174,7 +175,9 @@ class MainActivity : Activity() {
             operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f).apply {
                 marginEnd = dp(24)
             })
-            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(dp(440), dp(88)))
+            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(dp(400), dp(88)).apply {
+                marginEnd = dp(12)
+            })
         } else {
             operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
             operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, dp(64)).apply {
@@ -364,7 +367,11 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun buttonInteractionAnimator(view: View, focusedScale: Float = 1.03f): StateListAnimator {
+    private fun buttonInteractionAnimator(
+        view: View,
+        focusedScale: Float = 1.03f,
+        pressedScale: Float = 0.96f
+    ): StateListAnimator {
         fun animation(scale: Float, translationY: Float, elevation: Float): AnimatorSet {
             return AnimatorSet().apply {
                 playTogether(
@@ -380,7 +387,7 @@ class MainActivity : Activity() {
 
         return StateListAnimator().apply {
             addState(intArrayOf(-android.R.attr.state_enabled), animation(1f, 0f, 0f))
-            addState(intArrayOf(android.R.attr.state_pressed), animation(0.96f, 4f, 2f))
+            addState(intArrayOf(android.R.attr.state_pressed), animation(pressedScale, 4f, 2f))
             addState(intArrayOf(android.R.attr.state_focused), animation(focusedScale, -3f, 10f))
             addState(intArrayOf(), animation(1f, 0f, 0f))
         }
