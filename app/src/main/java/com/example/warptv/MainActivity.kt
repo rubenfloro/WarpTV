@@ -252,7 +252,7 @@ class MainActivity : Activity() {
             textSize = 15f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
-            setPadding(8, 0, 8, 0)
+            setPadding(20, 0, 20, 0)
             setMinHeight(0)
             includeFontPadding = false
             isFocusable = true
@@ -265,7 +265,7 @@ class MainActivity : Activity() {
             textSize = 20f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
-            setPadding(16, 0, 16, 0)
+            setPadding(24, 0, 24, 0)
             setMinHeight(0)
             includeFontPadding = false
             isFocusable = true
@@ -282,15 +282,20 @@ class MainActivity : Activity() {
             background = operatorPanelBackground()
         }
         operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
-        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, 48).apply {
+        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-2, 60).apply {
             topMargin = 10
+            gravity = Gravity.CENTER_HORIZONTAL
         })
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(button, LinearLayout.LayoutParams(-1, 80).apply { bottomMargin = 18 })
+        root.addView(button, LinearLayout.LayoutParams(-2, 80).apply {
+            topMargin = 12
+            bottomMargin = 18
+            gravity = Gravity.CENTER_HORIZONTAL
+        })
         root.addView(operatorPanel, LinearLayout.LayoutParams(-1, -2))
         val content = FrameLayout(this).apply {
             clipChildren = false
