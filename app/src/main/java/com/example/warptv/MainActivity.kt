@@ -6,6 +6,8 @@ import android.animation.StateListAnimator
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
@@ -18,8 +20,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.wireguard.android.backend.Backend
 import com.wireguard.android.backend.Tunnel
@@ -69,6 +73,11 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = if (isMobileFormFactor()) {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
         buildUi()
         backend = WarpRuntime.getBackend(this)
         WarpRuntime.setStateListener { newState -> runOnUiThread { render(newState) } }
@@ -83,7 +92,17 @@ class MainActivity : Activity() {
         render(currentState())
     }
 
+    private fun isMobileFormFactor(): Boolean {
+        return !packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) &&
+            resources.configuration.smallestScreenWidthDp < 600
+    }
+
     private fun buildUi() {
+        if (isMobileFormFactor()) {
+            buildMobileUi()
+            return
+        }
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -161,6 +180,116 @@ class MainActivity : Activity() {
         root.addView(button, LinearLayout.LayoutParams(640, 128).apply { bottomMargin = 28 })
         root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 156))
         setContentView(root)
+        button.post { button.requestFocus() }
+    }
+
+    private fun buildMobileUi() {
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            setBackgroundColor(0xFF101216.toInt())
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            setPadding(12, 4, 12, 4)
+            clipChildren = false
+            clipToPadding = false
+            setBackgroundColor(0xFF101216.toInt())
+        }
+        val title = TextView(this).apply {
+            text = "WARP TV"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(0xFFFFFFFF.toInt())
+        }
+        status = TextView(this).apply {
+            textSize = 19f
+            gravity = Gravity.CENTER
+            setPadding(0, 6, 0, 2)
+            includeFontPadding = false
+            setTextColor(STATUS_NEUTRAL)
+        }
+        details = TextView(this).apply {
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 4)
+            includeFontPadding = false
+            setTextColor(STATUS_NEUTRAL)
+        }
+        metrics = TextView(this).apply {
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 4)
+            includeFontPadding = false
+            setTextColor(STATUS_NEUTRAL)
+        }
+        diagnostics = TextView(this).apply {
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 5)
+            includeFontPadding = false
+            maxLines = 4
+            setHorizontallyScrolling(false)
+            setTextColor(STATUS_NEUTRAL)
+        }
+        operatorBlockStatus = TextView(this).apply {
+            textSize = 13f
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(0, 0, 0, 0)
+            includeFontPadding = false
+            maxLines = 3
+            setHorizontallyScrolling(false)
+            setTextColor(STATUS_NEUTRAL)
+        }
+        operatorRefreshButton = Button(this).apply {
+            text = "ACTUALIZAR DATOS"
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(buttonTextColor())
+            setPadding(8, 0, 8, 0)
+            setMinHeight(0)
+            includeFontPadding = false
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = buttonBackground()
+            stateListAnimator = buttonInteractionAnimator(this)
+            setOnClickListener { refreshOperatorBlockStatus() }
+        }
+        button = Button(this).apply {
+            textSize = 20f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(buttonTextColor())
+            setPadding(16, 0, 16, 0)
+            setMinHeight(0)
+            includeFontPadding = false
+            isFocusable = true
+            isFocusableInTouchMode = true
+            background = buttonBackground()
+            stateListAnimator = buttonInteractionAnimator(this)
+            setOnClickListener { onMainButton() }
+        }
+        operatorPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(10, 6, 10, 6)
+            clipChildren = false
+            background = operatorPanelBackground()
+        }
+        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
+        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, 48).apply {
+            topMargin = 6
+        })
+        root.addView(title, LinearLayout.LayoutParams(-1, -2))
+        root.addView(status, LinearLayout.LayoutParams(-1, -2))
+        root.addView(details, LinearLayout.LayoutParams(-1, -2))
+        root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
+        root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
+        root.addView(button, LinearLayout.LayoutParams(-1, 80).apply { bottomMargin = 10 })
+        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, -2))
+        scrollView.addView(root, ViewGroup.LayoutParams(-1, -2))
+        setContentView(scrollView)
         button.post { button.requestFocus() }
     }
 
