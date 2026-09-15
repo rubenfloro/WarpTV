@@ -6,6 +6,7 @@ import android.animation.StateListAnimator
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
@@ -18,8 +19,10 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.wireguard.android.backend.Backend
 import com.wireguard.android.backend.Tunnel
@@ -84,58 +87,72 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
+        val widthDp = resources.configuration.screenWidthDp
+        val isTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+        val wideLayout = isTv || widthDp >= 700
+        val horizontalPadding = if (wideLayout) dp(80) else dp(16)
+        val verticalPadding = if (wideLayout) dp(48) else dp(20)
+        val mainButtonHeight = if (wideLayout) dp(128) else dp(64)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(80, 48, 80, 48)
+            setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
+            minimumHeight = resources.displayMetrics.heightPixels
             setBackgroundColor(0xFF101216.toInt())
         }
         val title = TextView(this).apply {
-            text = "WARP TV"; textSize = 42f; gravity = Gravity.CENTER
+            text = "WARP TV"; textSize = if (wideLayout) 42f else 30f; gravity = Gravity.CENTER
             setTextColor(0xFFFFFFFF.toInt())
         }
         status = TextView(this).apply {
-            textSize = 28f; gravity = Gravity.CENTER; setPadding(0, 24, 0, 12)
+            textSize = if (wideLayout) 28f else 22f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(if (wideLayout) 24 else 16), 0, dp(if (wideLayout) 12 else 8))
             setTextColor(STATUS_NEUTRAL)
         }
         details = TextView(this).apply {
-            textSize = 18f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 30)
+            textSize = if (wideLayout) 18f else 15f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(if (wideLayout) 30 else 16))
             setTextColor(STATUS_NEUTRAL)
         }
         metrics = TextView(this).apply {
-            textSize = 18f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 30)
+            textSize = if (wideLayout) 18f else 15f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(if (wideLayout) 30 else 16))
             setTextColor(STATUS_NEUTRAL)
         }
         diagnostics = TextView(this).apply {
-            textSize = 16f; gravity = Gravity.CENTER; setPadding(0, 0, 0, 18)
+            textSize = if (wideLayout) 16f else 13f
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(if (wideLayout) 18 else 12))
             setTextColor(STATUS_NEUTRAL)
         }
         operatorBlockStatus = TextView(this).apply {
-            textSize = 15f
+            textSize = if (wideLayout) 15f else 14f
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            setPadding(0, 12, 0, 12)
-            maxLines = 3
+            setPadding(0, dp(12), 0, dp(12))
+            maxLines = 4
             setHorizontallyScrolling(false)
             setTextColor(STATUS_NEUTRAL)
         }
         operatorRefreshButton = Button(this).apply {
             text = "ACTUALIZAR DATOS"
-            textSize = 18f
+            textSize = if (wideLayout) 18f else 15f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
-            setPadding(24, 0, 24, 0)
+            setPadding(dp(16), 0, dp(16), 0)
             isFocusable = true
             isFocusableInTouchMode = true
             background = buttonBackground()
-            // El margen derecho adicional permite ampliar ligeramente el botón al enfocarlo.
-            stateListAnimator = buttonInteractionAnimator(this)
+            stateListAnimator = buttonInteractionAnimator(this, focusedScale = 1f)
             setOnClickListener { refreshOperatorBlockStatus() }
         }
         button = Button(this).apply {
-            textSize = 26f
+            textSize = if (wideLayout) 26f else 20f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(buttonTextColor())
-            setPadding(24, 0, 24, 0)
+            setPadding(dp(16), 0, dp(16), 0)
             isFocusable = true
             isFocusableInTouchMode = true
             background = buttonBackground()
@@ -143,25 +160,47 @@ class MainActivity : Activity() {
             setOnClickListener { onMainButton() }
         }
         operatorPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = if (wideLayout) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(28, 12, 36, 12)
+            setPadding(
+                dp(if (wideLayout) 28 else 16),
+                dp(12),
+                dp(if (wideLayout) 36 else 16),
+                dp(12)
+            )
             background = operatorPanelBackground()
         }
-        operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f).apply {
-            marginEnd = 24
-        })
-        operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(440, 88).apply {
-            marginEnd = 24
-        })
+        if (wideLayout) {
+            operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f).apply {
+                marginEnd = dp(24)
+            })
+            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(dp(440), dp(88)).apply {
+                marginEnd = dp(24)
+            })
+        } else {
+            operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
+            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, dp(64)).apply {
+                topMargin = dp(8)
+            })
+        }
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(button, LinearLayout.LayoutParams(640, 128).apply { bottomMargin = 28 })
-        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 156))
-        setContentView(root)
+        root.addView(
+            button,
+            LinearLayout.LayoutParams(if (wideLayout) dp(640) else -1, mainButtonHeight).apply {
+                bottomMargin = dp(if (wideLayout) 28 else 20)
+            }
+        )
+        root.addView(operatorPanel, LinearLayout.LayoutParams(-1, if (wideLayout) dp(156) else -2))
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(0xFF101216.toInt())
+            addView(root, ViewGroup.LayoutParams(-1, -2))
+        }
+        setContentView(scrollView)
         button.post { button.requestFocus() }
     }
 
@@ -327,11 +366,7 @@ class MainActivity : Activity() {
         )
     }
 
-    private fun buttonInteractionAnimator(
-        view: View,
-        focusedScale: Float = 1.03f,
-        pressedScale: Float = 0.96f
-    ): StateListAnimator {
+    private fun buttonInteractionAnimator(view: View, focusedScale: Float = 1.03f): StateListAnimator {
         fun animation(scale: Float, translationY: Float, elevation: Float): AnimatorSet {
             return AnimatorSet().apply {
                 playTogether(
@@ -347,10 +382,14 @@ class MainActivity : Activity() {
 
         return StateListAnimator().apply {
             addState(intArrayOf(-android.R.attr.state_enabled), animation(1f, 0f, 0f))
-            addState(intArrayOf(android.R.attr.state_pressed), animation(pressedScale, 4f, 2f))
+            addState(intArrayOf(android.R.attr.state_pressed), animation(0.96f, 4f, 2f))
             addState(intArrayOf(android.R.attr.state_focused), animation(focusedScale, -3f, 10f))
             addState(intArrayOf(), animation(1f, 0f, 0f))
         }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density + 0.5f).toInt()
     }
 
     private fun operatorPanelBackground(): GradientDrawable {
