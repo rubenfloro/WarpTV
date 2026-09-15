@@ -6,6 +6,7 @@ import android.animation.StateListAnimator
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.content.res.Configuration
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Typeface
@@ -22,6 +23,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -189,10 +191,12 @@ class MainActivity : Activity() {
             clipToPadding = false
             setBackgroundColor(0xFF101216.toInt())
         }
+        val portrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        val operatorTextSize = if (portrait) 11f else 12f
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            setPadding(12, 4, 12, 4)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(24, 4, 24, 4)
             clipChildren = false
             clipToPadding = false
             setBackgroundColor(0xFF101216.toInt())
@@ -235,11 +239,11 @@ class MainActivity : Activity() {
             setTextColor(STATUS_NEUTRAL)
         }
         operatorBlockStatus = TextView(this).apply {
-            textSize = 13f
+            textSize = operatorTextSize
             gravity = Gravity.TOP or Gravity.START
             setPadding(0, 0, 0, 0)
             includeFontPadding = false
-            maxLines = 3
+            maxLines = Int.MAX_VALUE
             setHorizontallyScrolling(false)
             setTextColor(STATUS_NEUTRAL)
         }
@@ -273,23 +277,31 @@ class MainActivity : Activity() {
         operatorPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(10, 6, 10, 6)
+            setPadding(12, 10, 12, 10)
             clipChildren = false
             background = operatorPanelBackground()
         }
         operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
         operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, 48).apply {
-            topMargin = 6
+            topMargin = 10
         })
         root.addView(title, LinearLayout.LayoutParams(-1, -2))
         root.addView(status, LinearLayout.LayoutParams(-1, -2))
         root.addView(details, LinearLayout.LayoutParams(-1, -2))
         root.addView(metrics, LinearLayout.LayoutParams(-1, -2))
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
-        root.addView(button, LinearLayout.LayoutParams(-1, 80).apply { bottomMargin = 10 })
+        root.addView(button, LinearLayout.LayoutParams(-1, 80).apply { bottomMargin = 18 })
         root.addView(operatorPanel, LinearLayout.LayoutParams(-1, -2))
-        scrollView.addView(root, ViewGroup.LayoutParams(-1, -2))
+        val content = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+        }
+        content.addView(root, FrameLayout.LayoutParams(-1, -2).apply {
+            gravity = Gravity.CENTER
+        })
+        scrollView.addView(content, ViewGroup.LayoutParams(-1, -2))
         setContentView(scrollView)
+        content.post { content.minimumHeight = scrollView.height }
         button.post { button.requestFocus() }
     }
 
