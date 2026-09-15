@@ -174,9 +174,7 @@ class MainActivity : Activity() {
             operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(0, -1, 1f).apply {
                 marginEnd = dp(24)
             })
-            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(dp(440), dp(88)).apply {
-                marginEnd = dp(24)
-            })
+            operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(dp(440), dp(88)))
         } else {
             operatorPanel.addView(operatorBlockStatus, LinearLayout.LayoutParams(-1, -2))
             operatorPanel.addView(operatorRefreshButton, LinearLayout.LayoutParams(-1, dp(64)).apply {
