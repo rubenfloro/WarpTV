@@ -8,7 +8,7 @@
         android:theme="@style/AppTheme"
         android:label="WARP TV"
         android:icon="@drawable/ic_launcher_custom"
-        android:banner="@drawable/tv_banner"
+        android:banner="@drawable/tv_banner_landscape"
         android:allowBackup="false"
         android:supportsRtl="true">
         <activity android:name=".MainActivity" android:exported="true">
