@@ -44,6 +44,7 @@ class MainActivity : Activity() {
         const val BUTTON_DISABLED = 0xFF64748B.toInt()
         const val BUTTON_TEXT = 0xFF062A3F.toInt()
         const val REQUEST_VPN = 1001
+        const val APP_DISPLAY_VERSION = "V4"
     }
 
     private lateinit var status: TextView
@@ -54,6 +55,8 @@ class MainActivity : Activity() {
     private lateinit var operatorPanel: LinearLayout
     private lateinit var operatorBlockStatus: TextView
     private lateinit var operatorRefreshButton: Button
+    private lateinit var tvSchedulePanel: LinearLayout
+    private lateinit var tvScheduleText: TextView
     private val executor = Executors.newSingleThreadExecutor()
     private val metricsHandler = Handler(Looper.getMainLooper())
     private val store by lazy { ConfigStore(this) }
@@ -63,6 +66,7 @@ class MainActivity : Activity() {
     private var lastRenderedState: Tunnel.State? = null
     private var diagnosticsQueryRunning = false
     private var operatorStatusQueryRunning = false
+    private var tvScheduleQueryRunning = false
     private val tunnel = WarpRuntime.tunnel
     private val connectedDiagnosticsRunnable = Runnable { queryConnectedDiagnostics() }
     private val disconnectedDiagnosticsRunnable = Runnable { queryDisconnectedIp() }
@@ -181,7 +185,9 @@ class MainActivity : Activity() {
         root.addView(diagnostics, LinearLayout.LayoutParams(-1, -2))
         root.addView(button, LinearLayout.LayoutParams(640, 128).apply { bottomMargin = 28 })
         root.addView(operatorPanel, LinearLayout.LayoutParams(-1, 156))
-        setContentView(root)
+        tvSchedulePanel = createTvSchedulePanel(15f, false)
+        root.addView(tvSchedulePanel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 16 })
+        setContentViewWithVersion(root)
         button.post { button.requestFocus() }
     }
 
@@ -297,6 +303,8 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         })
         root.addView(operatorPanel, LinearLayout.LayoutParams(-1, -2))
+        tvSchedulePanel = createTvSchedulePanel(if (portrait) 11f else 12f, false)
+        root.addView(tvSchedulePanel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = 12 })
         val content = FrameLayout(this).apply {
             clipChildren = false
             clipToPadding = false
@@ -305,9 +313,48 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         })
         scrollView.addView(content, ViewGroup.LayoutParams(-1, -2))
-        setContentView(scrollView)
+        setContentViewWithVersion(scrollView)
         content.post { content.minimumHeight = scrollView.height }
         button.post { button.requestFocus() }
+    }
+
+    private fun setContentViewWithVersion(content: View) {
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(0xFF101216.toInt())
+        }
+        container.addView(content, FrameLayout.LayoutParams(-1, -1))
+        val version = TextView(this).apply {
+            text = APP_DISPLAY_VERSION
+            textSize = 13f
+            setTextColor(STATUS_NEUTRAL)
+            includeFontPadding = false
+        }
+        container.addView(version, FrameLayout.LayoutParams(-2, -2).apply {
+            gravity = Gravity.TOP or Gravity.END
+            topMargin = 12
+            marginEnd = 16
+        })
+        setContentView(container)
+    }
+
+    private fun createTvSchedulePanel(textSize: Float, centered: Boolean): LinearLayout {
+        tvScheduleText = TextView(this).apply {
+            textSize = textSize
+            gravity = if (centered) Gravity.CENTER else Gravity.TOP or Gravity.START
+            includeFontPadding = false
+            maxLines = Int.MAX_VALUE
+            setHorizontallyScrolling(false)
+            setTextColor(STATUS_NEUTRAL)
+            text = "Real Madrid: consultando…\nAt. Madrid: consultando…\nBarcelona: consultando…"
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = if (centered) Gravity.CENTER else Gravity.START
+            setPadding(28, 12, 28, 12)
+            background = operatorPanelBackground()
+            visibility = View.GONE
+            addView(tvScheduleText, LinearLayout.LayoutParams(-1, -2))
+        }
     }
 
     private fun onMainButton() {
@@ -355,6 +402,7 @@ class MainActivity : Activity() {
         // Android TV may restore the last focused view; the VPN action is always the default.
         button.post { if (!isFinishing) button.requestFocus() }
         refreshState()
+        if (config != null) refreshTvSchedule()
         metricsHandler.removeCallbacks(metricsTicker)
         metricsHandler.post(metricsTicker)
     }
@@ -401,6 +449,7 @@ class MainActivity : Activity() {
             metrics.text = ""
             diagnostics.text = ""
             operatorPanel.visibility = View.GONE
+            tvSchedulePanel.visibility = View.GONE
         } else if (state == Tunnel.State.UP) {
             WarpRuntime.ensureConnectionStarted()
             status.setTextColor(STATUS_GREEN)
@@ -410,6 +459,7 @@ class MainActivity : Activity() {
             metrics.text = formatMetrics(WarpRuntime.connectionStartMillis(), 0L, 0L)
             if (lastRenderedState != Tunnel.State.UP) scheduleConnectedDiagnostics()
             showOperatorBlockStatus()
+            tvSchedulePanel.visibility = View.VISIBLE
         } else {
             WarpRuntime.clearConnectionStart()
             status.setTextColor(STATUS_RED)
@@ -424,6 +474,7 @@ class MainActivity : Activity() {
                 scheduleDisconnectedDiagnostics()
             }
             showOperatorBlockStatus()
+            tvSchedulePanel.visibility = View.VISIBLE
         }
         lastRenderedState = state
     }
@@ -591,6 +642,30 @@ class MainActivity : Activity() {
         operatorRefreshButton.isEnabled = true
         operatorRefreshButton.alpha = if (operatorStatusQueryRunning) 0.65f else 1f
         if (operatorBlockStatus.text.isNullOrBlank()) refreshOperatorBlockStatus()
+    }
+
+    private fun refreshTvSchedule() {
+        if (tvScheduleQueryRunning || config == null) return
+        tvScheduleQueryRunning = true
+        tvScheduleText.setTextColor(STATUS_NEUTRAL)
+        tvScheduleText.text = "Real Madrid: consultando…\nAt. Madrid: consultando…\nBarcelona: consultando…"
+        executor.execute {
+            val result = runCatching { TvScheduleStatus.fetch() }
+                .getOrElse {
+                    TvScheduleStatus.Result(listOf(
+                        "Real Madrid: información no disponible",
+                        "At. Madrid: información no disponible",
+                        "Barcelona: información no disponible"
+                    ))
+                }
+            runOnUiThread {
+                tvScheduleQueryRunning = false
+                if (!isFinishing && config != null) {
+                    tvScheduleText.text = result.lines.joinToString("\n")
+                    tvScheduleText.setTextColor(STATUS_NEUTRAL)
+                }
+            }
+        }
     }
 
     private fun refreshOperatorBlockStatus() {
