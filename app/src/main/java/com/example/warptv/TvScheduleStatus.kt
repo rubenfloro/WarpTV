@@ -7,6 +7,7 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
 /** Reads the next televised match for the three requested teams. */
@@ -47,7 +48,7 @@ object TvScheduleStatus {
     fun fetch(): Result {
         val pool = Executors.newFixedThreadPool(pages.size)
         return try {
-            val futures = pages.map { page -> pool.submit { fetchPage(page) } }
+            val futures = pages.map { page -> pool.submit(Callable { fetchPage(page) }) }
             Result(futures.map { it.get() })
         } finally {
             pool.shutdownNow()
