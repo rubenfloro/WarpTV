@@ -1,38 +1,77 @@
 # WARP TV
 
-Android TV application that embeds WireGuard and generates a Cloudflare WARP WireGuard profile locally.
+Aplicación Android para Android TV, móviles y tablets que integra WireGuard y genera una configuración Cloudflare WARP directamente en el dispositivo.
 
-## V1 behavior
+## Versión actual
 
-- No automatic VPN connection at application launch.
-- First button press generates a WARP registration and stores the resulting WireGuard configuration encrypted with Android Keystore.
-- After configuration, the main button toggles the VPN ON/OFF.
-- The WireGuard tunnel is embedded using `com.wireguard.android:tunnel`.
-- Universal APK build: ABI splits are disabled and the workflow uploads the single debug APK.
-- Target Android TV / Android 8.0+ (minSdk 24).
+- Versión visible: `V4`
+- Versión interna: `4.0.0`
+- Código de versión: `13`
+- APK universal: un único APK para todos los dispositivos compatibles.
 
-## WARP registration flow
+## Funciones
 
-The original generator's documented flow is:
+- Generación y almacenamiento local de la configuración WireGuard/WARP.
+- Activación y desactivación manual de la VPN.
+- Comprobación del estado real del túnel al volver a abrir la aplicación.
+- Tiempo de conexión y estadísticas de descarga y subida.
+- IP pública sin VPN, IP pública con WARP y localización de Cloudflare.
+- DNS configuradas automáticamente:
 
-1. Generate a WireGuard keypair locally.
-2. Register the public key with Cloudflare WARP.
-3. Build the complete WireGuard configuration.
+  ```text
+  DNS = 94.140.14.14, 94.140.15.15, 2a10:50c0::ad1:ff, 2a10:50c0::ad2:ff
+  ```
 
-This app performs that flow natively. It does not depend on the generator web page or its CORS proxy.
+- Información de bloqueos relacionados con fútbol, con IPs y operadores afectados.
+- Próximos partidos televisados de Real Madrid, At. Madrid y Barcelona.
+- Actualización automática de los partidos cada vez que se abre la aplicación.
+- Diseño adaptado para Android TV, móviles y tablets.
+- Iconos y banners diferenciados para Android TV hasta la versión 12 y Android TV 13 o superior.
 
-## Build
+## Compatibilidad
 
-Open the project in Android Studio and run `assembleDebug`.
+- Android 7.0 o superior (`minSdk 24`).
+- Android TV, móviles y tablets.
+- En móviles se permite utilizar la aplicación en orientación vertical y horizontal.
+- Android TV mantiene su distribución horizontal optimizada para televisión.
 
-The repository also includes `.github/workflows/build-apk.yml`, which builds a universal debug APK in GitHub Actions using JDK 17, Gradle 8.13 and Android SDK 36. The uploaded file is named `warp-tv-universal-debug.apk`.
+## Compilación con GitHub Actions
 
-## Important
+El repositorio incluye el workflow `.github/workflows/build-apk.yml`.
 
-The Cloudflare WARP registration endpoint used by the original project is unofficial/undocumented. Availability or response format may change. The app therefore validates the required response fields and reports a clear error if registration fails.
+Para generar el APK:
 
-The generated profile contains a WireGuard private key. It is stored encrypted using Android Keystore and is never intentionally displayed by the app.
+1. Sube el contenido del proyecto al repositorio de GitHub.
+2. Abre la pestaña **Actions**.
+3. Selecciona **Build WARP TV universal APK**.
+4. Pulsa **Run workflow** o espera a que se ejecute tras subir cambios a `main`.
+5. Descarga el artefacto `warp-tv-universal-debug-apk`.
 
-## Licenses
+El APK generado se encuentra en `app/build/outputs/apk/debug/app-debug.apk`.
 
-WireGuard Android's embeddable tunnel library is Apache-2.0. The original WARP generator is a separate project with its own repository/license terms. Before redistribution, keep the applicable attribution/license notices and review the upstream repository's current license.
+El workflow utiliza JDK 17, Gradle 8.13 y Android SDK 36.
+
+## Seguridad y almacenamiento
+
+La clave privada WireGuard se almacena cifrada mediante Android Keystore y no se muestra intencionadamente en la interfaz.
+
+La autorización de VPN la gestiona Android mediante `VpnService.prepare()`. El aviso de Google Play Protect puede aparecer porque el APK se distribuye fuera de Google Play y está firmado como aplicación de depuración.
+
+## Fuentes externas
+
+La aplicación consulta información pública de estas páginas:
+
+- Bloqueos de fútbol: `https://hayahora.futbol/`
+- Real Madrid: `https://www.futbolenlatv.es/equipo/real-madrid`
+- At. Madrid: `https://www.futbolenlatv.es/equipo/at-madrid`
+- Barcelona: `https://www.futbolenlatv.es/equipo/fc-barcelona`
+
+Si alguna web cambia su estructura o deja de estar disponible, la aplicación mostrará que la información no está disponible sin impedir el funcionamiento de la VPN.
+
+## Limitaciones
+
+El registro de Cloudflare WARP utiliza un endpoint no oficial. Su disponibilidad o formato de respuesta puede cambiar. La aplicación valida los datos recibidos y muestra un error si no puede completar el registro.
+
+## Licencias
+
+La biblioteca embebida de WireGuard Android utiliza licencia Apache-2.0. El proyecto original del generador WARP tiene sus propias condiciones de licencia y atribución, que deben revisarse antes de redistribuir la aplicación.
