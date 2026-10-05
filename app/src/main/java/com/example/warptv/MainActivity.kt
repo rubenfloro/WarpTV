@@ -339,7 +339,7 @@ class MainActivity : Activity() {
 
     private fun createTvSchedulePanel(textSize: Float, centered: Boolean): LinearLayout {
         tvScheduleText = TextView(this).apply {
-            textSize = textSize
+            this.textSize = textSize
             gravity = if (centered) Gravity.CENTER else Gravity.TOP or Gravity.START
             includeFontPadding = false
             maxLines = Int.MAX_VALUE
